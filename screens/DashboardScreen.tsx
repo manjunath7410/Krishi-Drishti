@@ -35,11 +35,20 @@ import {
   BarChart2,
   Search,
   Grid3x3,
+  Film,
+  Image as ImageIcon,
+  Crosshair,
+  Navigation,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
-import { weatherService } from '../src/services/api';
+import { weatherService, getPinpointLocation } from '../src/services/api';
 import WeatherModal from '../components/WeatherModal';
 import CarbonWalletCard from '../components/CarbonWalletCard';
 import { plotService } from '../src/services/api';
+import AgroEmergencyBanner from '../components/AgroEmergencyBanner';
+import MandiPricePredictor from '../components/MandiPricePredictor';
 
 interface DashboardScreenProps {
   navigateTo: (screen: Screen) => void;
@@ -49,9 +58,29 @@ interface DashboardScreenProps {
   currentLang: Language;
   weather: any;
   locationName: string;
+  userCoords?: { lat: number; lng: number } | null;
+  gpsAccuracy?: number | null;
+  isLiveTracking?: boolean;
+  onToggleLiveTracking?: () => void;
+  onUpdateLocation?: (coords: { lat: number; lng: number; accuracy?: number; name?: string }, persist?: boolean) => void;
+  onOpenSearch?: () => void;
 }
 
-const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigateTo, user, t, onLangChange, currentLang, weather, locationName }) => {
+const DashboardScreen: React.FC<DashboardScreenProps> = ({
+  navigateTo,
+  user,
+  t,
+  onLangChange,
+  currentLang,
+  weather,
+  locationName,
+  userCoords,
+  gpsAccuracy,
+  isLiveTracking,
+  onToggleLiveTracking,
+  onUpdateLocation,
+  onOpenSearch
+}) => {
   const [showWeatherModal, setShowWeatherModal] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [userPlots, setUserPlots] = useState<any[]>([]);
@@ -61,6 +90,11 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigateTo, user, t, 
 
   // ── Location picker state ──
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [locationTab, setLocationTab] = useState<'gps' | 'search' | 'manual'>('gps');
+  const [isAcquiringGps, setIsAcquiringGps] = useState(false);
+  const [gpsMessage, setGpsMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [manualLat, setManualLat] = useState('');
+  const [manualLng, setManualLng] = useState('');
   const [cityQuery, setCityQuery] = useState('');
   const [cityResults, setCityResults] = useState<any[]>([]);
   const [citySearching, setCitySearching] = useState(false);
@@ -79,26 +113,14 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigateTo, user, t, 
         const data = await plotService.getPlots();
         setUserPlots(data);
 
-        // Sequential geocoding with 250ms throttle to respect Nominatim's 1 req/s limit
+        // Instant location assignment from plot metadata, avoiding UI-blocking sequential network requests
         const locationMap: { [key: number]: string } = {};
         for (const plot of data) {
-          if (plot.coordinates && plot.coordinates.length > 0) {
-            const firstCoord = plot.coordinates[0];
-            try {
-              const locData = await weatherService.reverseGeocode(firstCoord.lat, firstCoord.lng);
-              if (locData && (locData.city || locData.district)) {
-                locationMap[plot.id] = `${locData.city || ''}${locData.city && locData.district ? ', ' : ''}${locData.district || ''}`;
-              } else {
-                locationMap[plot.id] = locationFallback.split(',')[0] || 'Unknown Location';
-              }
-            } catch (locErr) {
-              console.error(`Failed to reverse geocode plot ${plot.id}:`, locErr);
-              locationMap[plot.id] = locationFallback.split(',')[0] || 'Unknown Location';
-            }
-            // 250ms throttle — prevents 429 rate-limiting from Nominatim (1 req/s max)
-            await new Promise(r => setTimeout(r, 250));
+          const nameMatch = plot.name?.match(/\(([^)]+)\)/);
+          if (nameMatch && nameMatch[1]) {
+            locationMap[plot.id] = nameMatch[1];
           } else {
-            locationMap[plot.id] = locationFallback.split(',')[0] || 'Unknown Location';
+            locationMap[plot.id] = locationFallback.split(',')[0] || 'Farm Plot';
           }
         }
         setPlotLocationNames(locationMap);
@@ -111,6 +133,40 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigateTo, user, t, 
     };
     fetchPlots();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Real-time GPS pinpoint acquisition ──
+  const handleAcquireRealGps = async () => {
+    setIsAcquiringGps(true);
+    setGpsMessage({ text: 'Connecting to GPS satellites & sensors for high precision...', type: 'info' });
+    try {
+      const pinpoint = await getPinpointLocation({ enableHighAccuracy: true, timeout: 12000 });
+      if (onUpdateLocation) {
+        onUpdateLocation({
+          lat: pinpoint.lat,
+          lng: pinpoint.lng,
+          accuracy: pinpoint.accuracy
+        }, true);
+      } else {
+        localStorage.setItem('kd_saved_location', JSON.stringify(pinpoint));
+        sessionStorage.removeItem('kd_last_location');
+      }
+      setGpsMessage({
+        text: `Real-time pinpoint GPS locked: ±${pinpoint.accuracy || 5}m accuracy!`,
+        type: 'success'
+      });
+      setTimeout(() => {
+        setShowLocationPicker(false);
+        setGpsMessage(null);
+      }, 1400);
+    } catch (err: any) {
+      setGpsMessage({
+        text: err?.message || 'Could not access device GPS. Please ensure Location is allowed in browser settings.',
+        type: 'error'
+      });
+    } finally {
+      setIsAcquiringGps(false);
+    }
+  };
 
   // ── City search debounce ──
   const handleCitySearch = (q: string) => {
@@ -129,15 +185,32 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigateTo, user, t, 
 
   const handlePickCity = (city: any) => {
     const loc = { lat: city.latitude, lng: city.longitude, name: `${city.name}, ${city.country}` };
-    // Persist so it overrides IP location on next load
     localStorage.setItem('kd_saved_location', JSON.stringify(loc));
-    // Clear session cache so App.tsx re-fetches weather with new coords
     sessionStorage.removeItem('kd_last_location');
+    if (onUpdateLocation) {
+      onUpdateLocation(loc, true);
+    }
     setShowLocationPicker(false);
     setCityQuery('');
     setCityResults([]);
-    // Reload to apply new location everywhere
-    window.location.reload();
+  };
+
+  const handleManualCoordsSubmit = () => {
+    const lat = parseFloat(manualLat);
+    const lng = parseFloat(manualLng);
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      setGpsMessage({ text: 'Please enter valid coordinates (-90 to 90 lat, -180 to 180 lng)', type: 'error' });
+      return;
+    }
+    const loc = { lat, lng, name: `Farm Coordinates (${lat.toFixed(4)}°, ${lng.toFixed(4)}°)` };
+    localStorage.setItem('kd_saved_location', JSON.stringify(loc));
+    sessionStorage.removeItem('kd_last_location');
+    if (onUpdateLocation) {
+      onUpdateLocation(loc, true);
+    }
+    setShowLocationPicker(false);
+    setManualLat('');
+    setManualLng('');
   };
 
   const currentTemp = weather?.current?.temperature_2m ? Math.round(weather.current.temperature_2m) : '--';
@@ -210,16 +283,37 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigateTo, user, t, 
           <h1 className="text-4xl font-light text-gray-800 tracking-tight">Hello, <span className="font-bold text-gray-900">{user?.name?.split(' ')[0] || 'Farmer'}</span></h1>
           <button
             onClick={() => setShowLocationPicker(true)}
-            className="flex flex-col mt-1 self-start px-2 py-1.5 rounded-xl hover:bg-amber-50 active:scale-95 transition-all border border-transparent hover:border-amber-200 group"
+            className="flex flex-col mt-1 self-start px-2 py-1.5 rounded-xl hover:bg-emerald-50 active:scale-95 transition-all border border-transparent hover:border-emerald-200 group text-left"
+            title="Tap to view or update real-time pinpoint location"
           >
-            <div className="flex items-center gap-1">
-              <MapPin size={14} className="text-emerald-500" fill="currentColor" />
-              <span className="text-sm font-semibold text-gray-800 tracking-wide">{locationName.split(',')[0]}</span>
+            <div className="flex items-center gap-1.5">
+              <MapPin size={16} className="text-emerald-600 flex-shrink-0" fill="currentColor" />
+              <span className="text-sm font-bold text-gray-900 tracking-wide">{locationName}</span>
               <span className="text-[10px] text-gray-400 font-bold">▼</span>
             </div>
-            <span className="text-[10px] text-amber-500 font-semibold ml-4 group-hover:text-amber-600">
-              Wrong location? Tap to set →
-            </span>
+            <div className="flex items-center gap-2 mt-0.5 ml-5">
+              {isLiveTracking ? (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-red-100 text-red-600 animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                  Live GPS Tracking
+                </span>
+              ) : gpsAccuracy ? (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-100 text-emerald-800">
+                  <Crosshair size={10} className="text-emerald-600" />
+                  Pinpoint GPS ±{gpsAccuracy}m
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold group-hover:underline">
+                  <Navigation size={10} />
+                  Real-time Pinpoint Location
+                </span>
+              )}
+              {userCoords && (
+                <span className="text-[10px] font-mono text-gray-400 hidden sm:inline">
+                  {userCoords.lat.toFixed(3)}°, {userCoords.lng.toFixed(3)}°
+                </span>
+              )}
+            </div>
           </button>
         </div>
 
@@ -302,6 +396,34 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigateTo, user, t, 
           </motion.button>
         </div>
       </motion.div>
+
+      {/* Global Quick Search Launcher */}
+      <div className="px-5 mb-4">
+        <button
+          onClick={() => onOpenSearch && onOpenSearch()}
+          className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-emerald-50/40 active:scale-[0.99] border border-gray-200/90 rounded-2xl shadow-xs transition-all text-left group"
+        >
+          <div className="flex items-center gap-3">
+            <Search size={18} className="text-emerald-600 group-hover:scale-110 transition-transform" />
+            <span className="text-xs sm:text-sm font-medium text-gray-400 group-hover:text-gray-600">
+              Search 20+ tools, crops, diseases, schemes...
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="hidden sm:inline-block px-2 py-0.5 rounded bg-gray-100 text-[10px] font-mono text-gray-500 font-bold border border-gray-200">
+              ⌘K
+            </span>
+            <span className="text-xs font-bold text-emerald-600">Find →</span>
+          </div>
+        </button>
+      </div>
+
+      {/* Live Agro-Emergency & Weather Risk Advisory Banner */}
+      <AgroEmergencyBanner
+        weather={weather}
+        locationName={locationName}
+        currentLang={currentLang}
+      />
 
       {/* 2. Weather Section */}
       <motion.div
@@ -456,7 +578,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigateTo, user, t, 
       <div className="px-5 mt-4 mb-6" style={{ fontFamily: 'Inter, sans-serif' }}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-bold" style={{ color: '#001A11' }}>Services</h2>
-          <span className="text-[11px] font-semibold" style={{ color: '#00BB78' }}>9 tools</span>
+          <span className="text-[11px] font-semibold" style={{ color: '#00BB78' }}>10 tools</span>
         </div>
 
         {/* ── ROW 1: Two featured large cards ── */}
@@ -521,30 +643,59 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigateTo, user, t, 
         {/* ── ROW 3: Compact list ── */}
         <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid #F0F0F0' }}>
           {[
+            { icon: <Film size={15} strokeWidth={2} />, label: 'Veo Video Studio', desc: 'Animate photos & text-to-video (Free)', screen: 'veo-studio', highlight: true },
+            { icon: <ImageIcon size={15} strokeWidth={2} />, label: 'Media Gallery', desc: 'View, play & manage generated videos & scans', screen: 'media-gallery', highlight: false, badge: 'New' },
             { icon: <Zap size={15} strokeWidth={2} />, label: 'Weather Forecast', desc: '7-day prediction', screen: 'forecast' },
             { icon: <Droplets size={15} strokeWidth={2} />, label: 'Smart Irrigation', desc: 'Water optimization', screen: 'smart-irrigation' },
             { icon: <Grid3x3 size={15} strokeWidth={2} />, label: 'Digital Twin', desc: '2D farm layout', screen: 'digital-twin' },
             { icon: <Radio size={15} strokeWidth={2} />, label: 'Acoustic Scan', desc: 'Bioacoustic monitor', screen: 'acoustic-scanner' },
             { icon: <Link2 size={15} strokeWidth={2} />, label: 'Traceability', desc: 'Supply chain QR', screen: 'traceability' },
-          ].map((s, i) => (
+          ].map((s, i, arr) => (
             <motion.button
               key={i}
               whileTap={{ scale: 0.98 }}
               onClick={() => navigateTo(s.screen as Screen)}
-              className="w-full flex items-center gap-3 px-4 py-3.5 bg-white text-left"
-              style={{ borderBottom: i < 2 ? '1px solid #F8F8F8' : 'none' }}
+              className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors ${
+                s.highlight ? 'bg-emerald-50/60 hover:bg-emerald-50' : 'bg-white hover:bg-gray-50/80'
+              }`}
+              style={{ borderBottom: i < arr.length - 1 ? '1px solid #F0F0F0' : 'none' }}
             >
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#F5F5F5', color: '#616B68' }}>
+              <div
+                className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{
+                  background: s.highlight ? '#00BB78' : s.badge ? '#E8FBF3' : '#F5F5F5',
+                  color: s.highlight ? '#FFFFFF' : s.badge ? '#00BB78' : '#616B68',
+                }}
+              >
                 {s.icon}
               </div>
               <div className="flex-1">
-                <p className="text-[13px] font-semibold" style={{ color: '#001A11' }}>{s.label}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[13px] font-semibold" style={{ color: '#001A11' }}>{s.label}</p>
+                  {s.highlight && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200">
+                      Veo 3
+                    </span>
+                  )}
+                  {s.badge && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-600 text-white rounded-full">
+                      {s.badge}
+                    </span>
+                  )}
+                </div>
                 <p className="text-[11px]" style={{ color: '#616B68' }}>{s.desc}</p>
               </div>
               <ChevronRight size={14} style={{ color: '#A5FFA7', flexShrink: 0 }} />
             </motion.button>
           ))}
         </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════
+          AI MANDI PRICE INTELLIGENCE & FORECAST
+      ═══════════════════════════════════════════════ */}
+      <div className="px-5 mb-6">
+        <MandiPricePredictor />
       </div>
 
       {/* ═══════════════════════════════════════════════
@@ -694,86 +845,304 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({ navigateTo, user, t, 
               style={{ maxHeight: '80vh' }}
             >
               {/* Handle */}
-              <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5" />
+              <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
 
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: '#E8FBF3' }}>
-                  <MapPin size={20} style={{ color: '#00BB78' }} />
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 bg-emerald-50">
+                    <Crosshair size={20} className="text-emerald-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-gray-900">Pinpoint Real-Time Location</h2>
+                    <p className="text-xs text-gray-500">Real-time GPS satellite coordinates & live tracking</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-base font-bold" style={{ color: '#001A11' }}>Set Your Location</h2>
-                  <p className="text-xs" style={{ color: '#616B68' }}>Search for your city or district</p>
-                </div>
+                <button
+                  onClick={() => setShowLocationPicker(false)}
+                  className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 text-xs font-bold"
+                >
+                  ✕
+                </button>
               </div>
 
-              {/* Search input */}
-              <div className="relative mb-3">
-                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#616B68' }} />
-                <input
-                  autoFocus
-                  type="text"
-                  value={cityQuery}
-                  onChange={e => handleCitySearch(e.target.value)}
-                  placeholder="e.g. Nagpur, Pune, Hubli..."
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-2xl text-sm font-medium focus:outline-none transition-all"
-                  style={{ border: '1.5px solid #E0E0E0', fontFamily: 'Inter, sans-serif' }}
-                />
-                {citySearching && (
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                    <div className="w-4 h-4 rounded-full animate-spin" style={{ border: '2px solid #A5FFA7', borderTopColor: '#00BB78' }} />
-                  </div>
-                )}
+              {/* Location Tabs */}
+              <div className="flex items-center p-1 bg-gray-100 rounded-2xl mb-4 gap-1">
+                <button
+                  onClick={() => setLocationTab('gps')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                    locationTab === 'gps'
+                      ? 'bg-white text-emerald-800 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Navigation size={13} className={locationTab === 'gps' ? 'text-emerald-600' : ''} />
+                  Real GPS
+                </button>
+                <button
+                  onClick={() => setLocationTab('search')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                    locationTab === 'search'
+                      ? 'bg-white text-emerald-800 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Search size={13} className={locationTab === 'search' ? 'text-emerald-600' : ''} />
+                  Search Area
+                </button>
+                <button
+                  onClick={() => setLocationTab('manual')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                    locationTab === 'manual'
+                      ? 'bg-white text-emerald-800 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <MapPin size={13} className={locationTab === 'manual' ? 'text-emerald-600' : ''} />
+                  Coordinates
+                </button>
               </div>
 
-              {/* Results */}
-              <div className="overflow-y-auto" style={{ maxHeight: '45vh' }}>
-                {cityResults.length > 0 ? (
-                  <div className="space-y-1">
-                    {cityResults.map((city, i) => (
-                      <motion.button
-                        key={i}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.04 }}
-                        onClick={() => handlePickCity(city)}
-                        className="w-full flex items-center gap-3 p-3 rounded-2xl transition-colors text-left"
-                        style={{ '--hover-bg': '#E8FBF3' } as any}
-                        onMouseEnter={e => (e.currentTarget.style.background = '#E8FBF3')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                      >
-                        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#F5F5F5' }}>
-                          <MapPin size={14} style={{ color: '#616B68' }} />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold" style={{ color: '#001A11' }}>{city.name}</p>
-                          <p className="text-xs" style={{ color: '#616B68' }}>{city.country} · {city.latitude?.toFixed(2)}°N, {city.longitude?.toFixed(2)}°E</p>
-                        </div>
-                        <ChevronRight size={14} style={{ color: '#A5FFA7', marginLeft: 'auto', flexShrink: 0 }} />
-                      </motion.button>
-                    ))}
-                  </div>
-                ) : cityQuery && !citySearching ? (
-                  <div className="text-center py-8">
-                    <div className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                      <MapPin size={22} className="text-gray-400" />
+              {/* Status or Error Banner */}
+              {gpsMessage && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`p-3 rounded-2xl mb-3 text-xs flex items-center gap-2 ${
+                    gpsMessage.type === 'success'
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      : gpsMessage.type === 'error'
+                      ? 'bg-red-50 text-red-700 border border-red-200'
+                      : 'bg-blue-50 text-blue-700 border border-blue-200'
+                  }`}
+                >
+                  {gpsMessage.type === 'success' ? (
+                    <CheckCircle2 size={16} className="text-emerald-600 flex-shrink-0" />
+                  ) : gpsMessage.type === 'error' ? (
+                    <AlertCircle size={16} className="text-red-600 flex-shrink-0" />
+                  ) : (
+                    <RefreshCw size={16} className="text-blue-600 animate-spin flex-shrink-0" />
+                  )}
+                  <span className="font-medium">{gpsMessage.text}</span>
+                </motion.div>
+              )}
+
+              {/* Tab 1: Pinpoint Real-Time GPS */}
+              {locationTab === 'gps' && (
+                <div className="space-y-3">
+                  {/* Current Active Location Card */}
+                  <div className="p-3.5 bg-gradient-to-br from-emerald-50/70 to-teal-50/70 border border-emerald-100 rounded-2xl">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                          Active Pinpoint Location
+                        </span>
+                        <h3 className="text-base font-bold text-gray-900 mt-0.5">{locationName}</h3>
+                      </div>
+                      {isLiveTracking ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-600 animate-pulse flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                          Live Tracking
+                        </span>
+                      ) : gpsAccuracy ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                          <Crosshair size={10} />
+                          ±{gpsAccuracy}m precision
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600">
+                          Cached / Pinned
+                        </span>
+                      )}
                     </div>
-                    <p className="text-sm font-semibold text-gray-700">No results for "{cityQuery}"</p>
-                    <p className="text-xs text-gray-400 mt-1">Try a different spelling or nearby city</p>
-                  </div>
-                ) : !cityQuery ? (
-                  <div className="text-center py-6">
-                    <p className="text-xs text-gray-400 font-medium">Start typing to search cities</p>
-                    {localStorage.getItem('kd_saved_location') && (
-                      <button
-                        onClick={() => { localStorage.removeItem('kd_saved_location'); sessionStorage.removeItem('kd_last_location'); window.location.reload(); }}
-                        className="mt-3 text-xs text-red-500 font-semibold underline"
-                      >
-                        Reset to auto-detect
-                      </button>
+
+                    {userCoords && (
+                      <div className="mt-2 pt-2 border-t border-emerald-100/80 flex items-center justify-between text-xs text-gray-600 font-mono">
+                        <span>Lat: {userCoords.lat.toFixed(6)}°</span>
+                        <span>Lng: {userCoords.lng.toFixed(6)}°</span>
+                      </div>
                     )}
                   </div>
-                ) : null}
-              </div>
+
+                  {/* Acquire GPS Button */}
+                  <motion.button
+                    whileTap={{ scale: 0.98 }}
+                    disabled={isAcquiringGps}
+                    onClick={handleAcquireRealGps}
+                    className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-60 text-white font-bold rounded-2xl shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all"
+                  >
+                    {isAcquiringGps ? (
+                      <>
+                        <RefreshCw size={18} className="animate-spin" />
+                        <span>Acquiring High-Precision GPS...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Navigation size={18} fill="currentColor" />
+                        <span>Detect Pinpoint Real-Time GPS</span>
+                      </>
+                    )}
+                  </motion.button>
+
+                  {/* Live Tracking Switch */}
+                  {onToggleLiveTracking && (
+                    <div className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isLiveTracking ? 'bg-red-100 text-red-600' : 'bg-gray-200 text-gray-500'}`}>
+                          <Radio size={16} className={isLiveTracking ? 'animate-pulse' : ''} />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-gray-800">Continuous Live Tracking</p>
+                          <p className="text-[10px] text-gray-500">Auto-updates as you walk in your farm</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={onToggleLiveTracking}
+                        className={`relative w-12 h-6 rounded-full transition-colors ${isLiveTracking ? 'bg-red-500' : 'bg-gray-300'}`}
+                      >
+                        <span
+                          className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${isLiveTracking ? 'translate-x-6' : ''}`}
+                        />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Reset Override */}
+                  {localStorage.getItem('kd_saved_location') && (
+                    <div className="text-center pt-1">
+                      <button
+                        onClick={() => {
+                          localStorage.removeItem('kd_saved_location');
+                          sessionStorage.removeItem('kd_last_location');
+                          handleAcquireRealGps();
+                        }}
+                        className="text-xs text-gray-500 hover:text-red-500 font-semibold underline"
+                      >
+                        Clear saved override & re-detect GPS
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 2: Search Village / City */}
+              {locationTab === 'search' && (
+                <div>
+                  <div className="relative mb-3">
+                    <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      autoFocus
+                      type="text"
+                      value={cityQuery}
+                      onChange={e => handleCitySearch(e.target.value)}
+                      placeholder="e.g. Athani, Belagavi, Baramati, Pune..."
+                      className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-2xl text-sm font-medium focus:outline-none border border-gray-200 focus:border-emerald-500"
+                    />
+                    {citySearching && (
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                        <div className="w-4 h-4 rounded-full animate-spin border-2 border-emerald-400 border-t-emerald-600" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Quick agricultural hub chips */}
+                  {!cityQuery && (
+                    <div className="mb-3">
+                      <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                        Common Agricultural Regions
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { name: 'Belagavi', lat: 15.8497, lng: 74.4977, country: 'Karnataka, India' },
+                          { name: 'Kolhapur', lat: 16.7050, lng: 74.2433, country: 'Maharashtra, India' },
+                          { name: 'Pune', lat: 18.5204, lng: 73.8567, country: 'Maharashtra, India' },
+                          { name: 'Hubli', lat: 15.3647, lng: 75.1240, country: 'Karnataka, India' },
+                          { name: 'Vijayapura', lat: 16.8302, lng: 75.7100, country: 'Karnataka, India' },
+                          { name: 'Nashik', lat: 19.9975, lng: 73.7898, country: 'Maharashtra, India' },
+                          { name: 'Nagpur', lat: 21.1458, lng: 79.0882, country: 'Maharashtra, India' }
+                        ].map((hub, i) => (
+                          <button
+                            key={i}
+                            onClick={() => handlePickCity({ name: hub.name, country: hub.country, latitude: hub.lat, longitude: hub.lng })}
+                            className="px-2.5 py-1 bg-gray-100 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 border border-transparent rounded-lg text-xs font-medium text-gray-700 transition-colors"
+                          >
+                            {hub.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Search Results */}
+                  <div className="overflow-y-auto" style={{ maxHeight: '35vh' }}>
+                    {cityResults.length > 0 ? (
+                      <div className="space-y-1">
+                        {cityResults.map((city, i) => (
+                          <button
+                            key={i}
+                            onClick={() => handlePickCity(city)}
+                            className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-emerald-50 transition-colors text-left group"
+                          >
+                            <div className="w-8 h-8 rounded-xl bg-gray-100 group-hover:bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                              <MapPin size={14} className="text-gray-500 group-hover:text-emerald-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-gray-900 truncate">{city.name}</p>
+                              <p className="text-xs text-gray-500">{city.country} · {city.latitude?.toFixed(2)}°N, {city.longitude?.toFixed(2)}°E</p>
+                            </div>
+                            <ChevronRight size={14} className="text-gray-300 group-hover:text-emerald-600 flex-shrink-0" />
+                          </button>
+                        ))}
+                      </div>
+                    ) : cityQuery && !citySearching ? (
+                      <div className="text-center py-6 text-gray-400 text-xs">
+                        No locations found for "{cityQuery}"
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 3: Exact Farm Coordinates */}
+              {locationTab === 'manual' && (
+                <div className="space-y-3">
+                  <p className="text-xs text-gray-600">
+                    Enter the exact survey GPS coordinates of your agricultural land:
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-500 uppercase">Latitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={manualLat}
+                        onChange={e => setManualLat(e.target.value)}
+                        placeholder="e.g. 15.849700"
+                        className="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-500 uppercase">Longitude</label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={manualLng}
+                        onChange={e => setManualLng(e.target.value)}
+                        placeholder="e.g. 74.497700"
+                        className="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleManualCoordsSubmit}
+                    disabled={!manualLat || !manualLng}
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-2xl text-xs transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <CheckCircle2 size={16} />
+                    Apply Pinpoint Coordinates
+                  </button>
+                </div>
+              )}
             </motion.div>
           </>
         )}

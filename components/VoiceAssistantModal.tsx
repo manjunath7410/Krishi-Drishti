@@ -125,7 +125,7 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({ isOpen, onClo
                             const pcmBlob = createBlob(inputData);
                             sessionPromise.then((session) => {
                                 session.sendRealtimeInput({ media: pcmBlob });
-                            });
+                            }).catch(() => {});
                         };
 
                         // Connect the source to the processor
@@ -206,7 +206,7 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({ isOpen, onClo
 
     const stopSession = () => {
         if (sessionRef.current) {
-            sessionRef.current.then((session: any) => session.close());
+            sessionRef.current.then((session: any) => session.close()).catch(() => {});
         }
         if (audioContextInRef.current) audioContextInRef.current.close();
         if (audioContextOutRef.current) audioContextOutRef.current.close();

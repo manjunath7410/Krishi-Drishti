@@ -1,4 +1,4 @@
-export type Screen = 'landing' | 'auth' | 'home' | 'chat' | 'vision' | 'vision-result' | 'map' | 'market' | 'market-detail' | 'insurance' | 'forecast' | 'live-audio' | 'carbon-vault' | 'scheme-setu' | 'contracts' | 'crop-stress' | 'profile' | 'globe' | 'contracts' | 'landmark' | 'acoustic-scanner' | 'soil-carbon' | 'traceability' | 'trace-verify' | 'field-monitor' | 'crop-cycle' | 'marketplace' | 'corporate-dashboard' | 'smart-irrigation' | 'digital-twin';
+export type Screen = 'landing' | 'auth' | 'home' | 'chat' | 'vision' | 'vision-result' | 'map' | 'market' | 'market-detail' | 'insurance' | 'forecast' | 'live-audio' | 'carbon-vault' | 'scheme-setu' | 'contracts' | 'crop-stress' | 'profile' | 'globe' | 'landmark' | 'acoustic-scanner' | 'soil-carbon' | 'traceability' | 'trace-verify' | 'field-monitor' | 'crop-cycle' | 'marketplace' | 'corporate-dashboard' | 'smart-irrigation' | 'digital-twin' | 'veo-studio' | 'media-gallery';
 
 export type Language = 'en' | 'hi' | 'mr' | 'bn' | 'te' | 'ta' | 'pa' | 'kn';
 
@@ -7,12 +7,15 @@ export type VisionMode = 'diagnosis' | 'grading' | 'verify-qr';
 export interface UserProfile {
   name: string;
   district: string;
+  phone?: string;
+  state?: string;
   crops?: string | string[];
   language?: Language;
   land_size?: number; // Acres
   trust_score?: number;
   category?: 'General' | 'OBC' | 'SC' | 'ST';
   farming_type?: 'Organic' | 'Conventional' | 'Mixed';
+  soil_type?: string;
   location?: { lat: number; lng: number };
 }
 

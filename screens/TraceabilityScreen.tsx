@@ -68,7 +68,7 @@ const CycleIntro: React.FC<{ onDone: () => void }> = ({ onDone }) => {
 const QRPanel: React.FC<{ token: HarvestToken; onClose: () => void }> = ({ token, onClose }) => {
   const url = `${window.location.origin}?verify=${token.token_id}`;
   const [copied, setCopied] = useState(false);
-  const copy = () => navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  const copy = () => navigator.clipboard?.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(() => {});
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/50 backdrop-blur-sm" onClick={onClose}>

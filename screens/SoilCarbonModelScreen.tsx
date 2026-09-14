@@ -58,7 +58,7 @@ const SoilCarbonModelScreen = ({ navigateTo }: { navigateTo: (screen: Screen) =>
         
         getUserLocation().then(loc => {
             if (loc) setDefaultLoc(loc);
-        });
+        }).catch(() => {});
     }, []);
 
     const LocationMarker = () => {

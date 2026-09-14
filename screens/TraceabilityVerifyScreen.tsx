@@ -212,14 +212,14 @@ const TraceabilityVerifyScreen: React.FC<Props> = ({ navigateTo, tokenId }) => {
 
         {/* Chemical Inputs */}
         <Section title="03 — CHEMICAL INPUTS DECLARATION" defaultOpen={false}>
-          {token.chemical_inputs.length === 0 ? (
+          {(!token.chemical_inputs || token.chemical_inputs.length === 0) ? (
             <div className="border border-dashed border-zinc-800 py-5 text-center">
               <p className={`${mono()} text-zinc-700 text-xs`}>NO CHEMICAL INPUTS DECLARED</p>
               <p className="text-zinc-800 text-[10px] mt-1">Eligible for organic and chemical-free certification</p>
             </div>
           ) : (
             <div className="space-y-0">
-              {token.chemical_inputs.map((inp, i) => (
+              {(token.chemical_inputs || []).map((inp, i) => (
                 <div key={i} className="flex justify-between items-baseline py-2 border-b border-zinc-900 last:border-0">
                   <span className="text-zinc-300 text-xs">{inp.name}</span>
                   <div className="text-right">
@@ -254,10 +254,10 @@ const TraceabilityVerifyScreen: React.FC<Props> = ({ navigateTo, tokenId }) => {
         )}
 
         {/* Lifecycle Evidence */}
-        {token.crop_cycle && token.crop_cycle.events.length > 0 && (
+        {token.crop_cycle && (token.crop_cycle.events?.length ?? 0) > 0 && (
           <Section title="05 — LIFECYCLE EVIDENCE">
             <div className="space-y-4 pt-1">
-              {token.crop_cycle.events.map((e: any, i: number) => (
+              {(token.crop_cycle.events || []).map((e: any, i: number) => (
                 <div key={i} className="border border-zinc-800 p-3 bg-zinc-900/30">
                   <div className="flex justify-between items-start mb-2">
                     <p className={`${mono()} text-amber-400 text-sm font-bold uppercase tracking-wider`}>{e.type}</p>

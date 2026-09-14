@@ -5,6 +5,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Screen, Listing } from '../types';
 import { marketService, getUserLocation } from '../src/services/api';
 import { motion, AnimatePresence } from 'framer-motion';
+import MandiPricePredictor from '../components/MandiPricePredictor';
 import {
   Search,
   TrendingUp,
@@ -151,6 +152,11 @@ const MarketScreen: React.FC<MarketScreenProps> = ({ navigateTo, t }) => {
         </div>
       </div>
 
+      {/* ─── AI MANDI PRICE INTELLIGENCE ─── */}
+      <div className="px-5 mb-4">
+        <MandiPricePredictor />
+      </div>
+
       {/* ─── FEATURED BANNER ─── */}
       <div className="mx-5 mb-4 rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #166534 0%, #15803d 100%)' }}>
         <div className="flex items-center p-4">
@@ -217,11 +223,19 @@ const MarketScreen: React.FC<MarketScreenProps> = ({ navigateTo, t }) => {
         ) : (
           <div className="space-y-3">
             {filteredListings.map((item) => (
-              <motion.button
+              <motion.div
                 key={item.id}
+                role="button"
+                tabIndex={0}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => navigateTo('market-detail', { listing: item })}
-                className="w-full flex items-center gap-4 p-3.5 bg-white rounded-2xl text-left transition-colors"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    navigateTo('market-detail', { listing: item });
+                  }
+                }}
+                className="w-full flex items-center gap-4 p-3.5 bg-white rounded-2xl text-left transition-colors cursor-pointer select-none"
                 style={{ border: '1px solid #F0F0F0', boxShadow: '0 1px 4px rgba(0,187,120,0.04)' }}
               >
                 {/* Crop image */}
@@ -250,16 +264,16 @@ const MarketScreen: React.FC<MarketScreenProps> = ({ navigateTo, t }) => {
 
                 {/* Action */}
                 <div className="flex-shrink-0 flex flex-col items-end gap-2">
-                  <button
+                  <span
                     className="flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg"
                     style={{ background: C.bg, color: C.primary, border: `1px solid ${C.mint}` }}
                   >
                     <ShoppingCart size={12} />
                     Buy
-                  </button>
+                  </span>
                   <ChevronRight size={14} style={{ color: C.mint }} />
                 </div>
-              </motion.button>
+              </motion.div>
             ))}
           </div>
         )}

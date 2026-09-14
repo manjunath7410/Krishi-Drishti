@@ -153,7 +153,7 @@ const LiveAudioScreen: React.FC<LiveAudioScreenProps> = ({ navigateTo, language,
               const pcmBlob = createBlob(inputData);
               sessionPromise.then((session) => {
                 session.sendRealtimeInput({ media: pcmBlob });
-              });
+              }).catch(() => {});
             };
             source.connect(scriptProcessor);
             scriptProcessor.connect(audioContextInRef.current!.destination);
@@ -246,7 +246,7 @@ const LiveAudioScreen: React.FC<LiveAudioScreenProps> = ({ navigateTo, language,
 
   const stopSession = () => {
     if (sessionRef.current) {
-      sessionRef.current.then((session: any) => session.close());
+      sessionRef.current.then((session: any) => session.close()).catch(() => {});
     }
     if (audioContextInRef.current) audioContextInRef.current.close();
     if (audioContextOutRef.current) audioContextOutRef.current.close();

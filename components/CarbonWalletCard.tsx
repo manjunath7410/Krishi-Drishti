@@ -31,7 +31,8 @@ const CarbonWalletCard: React.FC = () => {
         setStatus('analyzing');
         try {
             const response = await carbonService.monitorPlot(userPlot.id, 'Cover-Crop');
-            setAnalysis(response.analysis);
+            const data = response?.analysis || response || {};
+            setAnalysis(data);
             setStatus('preview');
         } catch (error) {
             console.error(error);
@@ -44,6 +45,8 @@ const CarbonWalletCard: React.FC = () => {
     const issuable = analysis?.carbon?.issuable_credits ?? 0;
     const farmerShare = issuable * 0.8;
     const aggregatorFee = issuable * 0.2;
+    const ndviChange = analysis?.monitoring?.ndvi_change ?? analysis?.ndvi_change ?? 0;
+    const areaHectares = analysis?.area_hectares ?? userPlot?.area_acres ?? 0;
 
     return (
         <div className="bg-white rounded-3xl p-6 relative overflow-hidden border border-green-50 shadow-sm my-4">
@@ -86,13 +89,13 @@ const CarbonWalletCard: React.FC = () => {
                         <h4 className="text-sm font-bold text-gray-900 mb-2">Satellite Analysis Report</h4>
                         <div className="flex justify-between text-xs mb-1">
                             <span className="text-gray-600">NDVI change:</span>
-                            <span className={`font-bold ${analysis.monitoring.ndvi_change >= 0 ? 'text-green-700' : 'text-red-600'}`}>
-                                {analysis.monitoring.ndvi_change >= 0 ? '+' : ''}{analysis.monitoring.ndvi_change?.toFixed(2)}
+                            <span className={`font-bold ${ndviChange >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                                {ndviChange >= 0 ? '+' : ''}{Number(ndviChange).toFixed(2)}
                             </span>
                         </div>
                         <div className="flex justify-between text-xs mb-1">
                             <span className="text-gray-600">Boundary area:</span>
-                            <span className="font-bold text-green-700">{analysis.area_hectares} ha</span>
+                            <span className="font-bold text-green-700">{areaHectares} ha</span>
                         </div>
                         <div className="flex justify-between text-xs">
                             <span className="text-gray-600">Issuable after buffer:</span>

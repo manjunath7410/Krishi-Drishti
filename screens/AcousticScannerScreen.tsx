@@ -134,27 +134,19 @@ const AcousticScannerScreen: React.FC<{ navigation?: { goBack: () => void } }> =
         setResult(null);
         setErrorMsg(null);
         try {
-            const formData = new FormData();
-            formData.append('file', file);
-
-            const response = await axios.post<AnalysisResult>(SERVER_URL, formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-            });
-
-            setResult(response.data);
+            const data = await aiService.analyzeAudio(file);
+            setResult(data);
             
             // Trigger dynamic real AI analysis if a pest is actually detected
-            if (response.data.pest_detected) {
+            if (data.pest_detected) {
                 setDynamicAdvice("Consulting Krishi AI Agronomist on this pattern...");
                 try {
                     const aiChat = await aiService.chat(
-                        `Bioacoustic scanner detected ${response.data.pest_type} pest frequency patterns in my crop. Provide 1 specific, highly-actionable organic recommended action right now in English.`
+                        `Bioacoustic scanner detected ${data.pest_type} pest frequency patterns in my crop. Provide 1 specific, highly-actionable organic recommended action right now in English.`
                     );
                     setDynamicAdvice(aiChat.response);
                 } catch (e) {
-                    setDynamicAdvice(getPestAdvice(response.data.pest_type));
+                    setDynamicAdvice(getPestAdvice(data.pest_type));
                 }
             } else {
                 setDynamicAdvice(null);
@@ -162,7 +154,7 @@ const AcousticScannerScreen: React.FC<{ navigation?: { goBack: () => void } }> =
 
         } catch (error: any) {
             console.error("Error analyzing audio:", error);
-            setErrorMsg(error.response?.data?.detail || "Could not connect to the bioacoustic server.");
+            setErrorMsg(error.response?.data?.detail || "Could not connect to the bioacoustic analyzer.");
         } finally {
             setIsAnalyzing(false);
         }

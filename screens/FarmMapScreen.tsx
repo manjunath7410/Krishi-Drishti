@@ -58,7 +58,7 @@ const FarmMapScreen: React.FC<FarmMapScreenProps> = ({ navigateTo }) => {
   useEffect(() => {
     getCurrentLocation().then(pos => {
       if (pos) setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-    });
+    }).catch(() => {});
     fetchPlots();
   }, []);
 

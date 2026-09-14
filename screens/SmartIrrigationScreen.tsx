@@ -9,7 +9,7 @@ interface SmartIrrigationScreenProps {
 }
 
 interface IrrigationSchedule {
-  day: int;
+  day: number;
   day_name: string;
   should_irrigate: boolean;
   duration_minutes: number;
@@ -48,7 +48,7 @@ const SmartIrrigationScreen: React.FC<SmartIrrigationScreenProps> = ({ navigateT
     setError('');
     
     try {
-      const response = await axios.post('http://localhost:8000/api/irrigation/recommend', {
+      const response = await axios.post('/api/irrigation/recommend', {
         crop_type: crop,
         soil_type: soil,
         area_acres: parseFloat(area) || 1,

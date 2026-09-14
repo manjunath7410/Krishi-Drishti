@@ -52,8 +52,8 @@ const useGeolocation = (): GeolocationHook => {
         return pos;
       }
     } catch (err: any) {
-      console.error('getCurrentLocation Error:', err);
-      setError(err.message || 'Failed to get location');
+      console.warn('getCurrentLocation Notice (using fallback):', err?.message || err);
+      setError(err?.message || 'Failed to get location');
       return null;
     }
   };

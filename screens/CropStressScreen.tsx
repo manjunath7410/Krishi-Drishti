@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import axios from 'axios';
-import { getUserLocation } from '../src/services/api';
+import { getUserLocation, aiService } from '../src/services/api';
 import {
     AlertTriangle,
     CheckCircle,
@@ -41,7 +41,7 @@ const CropStressScreen = ({ navigateTo }: { navigateTo: (screen: Screen) => void
     const [cropType, setCropType] = useState("Wheat");
 
     React.useEffect(() => {
-        getUserLocation().then(loc => setPosition(loc));
+        getUserLocation().then(loc => setPosition(loc)).catch(() => {});
     }, []);
 
     const LocationMarker = () => {
@@ -63,18 +63,14 @@ const CropStressScreen = ({ navigateTo }: { navigateTo: (screen: Screen) => void
 
         setLoading(true);
         try {
-            // Real API Call
-            const token = localStorage.getItem('ks_token');
-            const response = await axios.post('http://127.0.0.1:8000/api/ai/analyze/stress', {
+            const data = await aiService.analyzeStress({
                 lat: position.lat,
                 lng: position.lng,
                 crop_type: cropType,
                 sensor_data: {}
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
             });
-            console.log("Real Precision Ag Data:", response.data);
-            setResult(response.data);
+            console.log("Precision Ag Stress Data:", data);
+            setResult(data);
             setLoading(false);
         } catch (error) {
             console.error("Error analyzing stress:", error);

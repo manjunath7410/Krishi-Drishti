@@ -530,9 +530,9 @@ const CarbonVaultScreen: React.FC<CarbonVaultScreenProps> = ({ navigateTo }) => 
                            </div>
                            <div className="grid grid-cols-3 gap-2">
                               {[
-                                 { label: 'NDVI', val: monitoringPreview.monitoring.current_ndvi?.toFixed(2) },
-                                 { label: 'Change', val: `${monitoringPreview.monitoring.ndvi_change >= 0 ? '+' : ''}${monitoringPreview.monitoring.ndvi_change?.toFixed(2)}` },
-                                 { label: 'Moisture', val: `${monitoringPreview.monitoring.soil_moisture?.toFixed(1)}%` },
+                                 { label: 'NDVI', val: monitoringPreview?.monitoring?.current_ndvi != null ? Number(monitoringPreview.monitoring.current_ndvi).toFixed(2) : '--' },
+                                 { label: 'Change', val: monitoringPreview?.monitoring?.ndvi_change != null ? `${monitoringPreview.monitoring.ndvi_change >= 0 ? '+' : ''}${Number(monitoringPreview.monitoring.ndvi_change).toFixed(2)}` : '--' },
+                                 { label: 'Moisture', val: monitoringPreview?.monitoring?.soil_moisture != null ? `${Number(monitoringPreview.monitoring.soil_moisture).toFixed(1)}%` : '--' },
                               ].map((s, i) => (
                                  <div key={i} className="rounded-xl p-2.5 text-center" style={{ background: '#F7F9F8' }}>
                                     <p className="text-[9px] uppercase font-black" style={{ color: '#616B68' }}>{s.label}</p>

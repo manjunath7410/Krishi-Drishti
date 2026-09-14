@@ -1,4 +1,6 @@
-/* Custom styles — Tailwind classes provided by CDN in index.html */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -71,4 +73,15 @@ body {
 @keyframes pulse-glow {
   0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
   50% { opacity: .7; transform: scale(1.05); box-shadow: 0 0 30px rgba(16, 185, 129, 0.6); }
+}
+
+@keyframes scan-beam {
+  0% { top: 6%; opacity: 0.2; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { top: 94%; opacity: 0.2; }
+}
+
+.animate-scan-beam {
+  animation: scan-beam 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
 }
