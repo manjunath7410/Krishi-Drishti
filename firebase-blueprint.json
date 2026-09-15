@@ -1,0 +1,179 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with contact, farm location, and verification details",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth user ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Farmer full legal name"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Farmer email address"
+        },
+        "phone": {
+          "type": "string",
+          "description": "10-digit Indian mobile number"
+        },
+        "village": {
+          "type": "string",
+          "description": "Village or Gram Panchayat"
+        },
+        "district": {
+          "type": "string",
+          "description": "District name"
+        },
+        "state": {
+          "type": "string",
+          "description": "State name"
+        },
+        "land_size": {
+          "type": "number",
+          "description": "Total landholding in acres"
+        },
+        "farming_type": {
+          "type": "string",
+          "description": "Type of agriculture practiced"
+        },
+        "crops": {
+          "type": "array",
+          "description": "List of cultivated crops"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "name", "email"]
+    },
+    "FarmPlot": {
+      "title": "FarmPlot",
+      "description": "Registered farm parcel with GPS coordinates, boundary polygon, area, and crop health telemetry",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique plot identifier"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Farm plot display label"
+        },
+        "crop": {
+          "type": "string",
+          "description": "Primary crop cultivated"
+        },
+        "area_acres": {
+          "type": "number",
+          "description": "Calculated or survey land area in acres"
+        },
+        "gut_number": {
+          "type": "string",
+          "description": "Revenue Gut / Survey number"
+        },
+        "coordinates": {
+          "type": "array",
+          "description": "Geodetic boundary vertices [{lat, lng}]"
+        },
+        "health": {
+          "type": "string",
+          "description": "NDVI health status"
+        },
+        "ndvi": {
+          "type": "number",
+          "description": "Normalized Difference Vegetation Index"
+        },
+        "soil_type": {
+          "type": "string",
+          "description": "Soil classification"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "userId", "name", "coordinates"]
+    },
+    "MarketplaceListing": {
+      "title": "MarketplaceListing",
+      "description": "Direct farm-to-buyer crop listing with APMC mandi pricing and escrow readiness",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Listing ID"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Seller Firebase Auth UID"
+        },
+        "seller_name": {
+          "type": "string",
+          "description": "Seller name"
+        },
+        "crop": {
+          "type": "string",
+          "description": "Commodity name"
+        },
+        "variety": {
+          "type": "string",
+          "description": "Variety or cultivar"
+        },
+        "quantity_quintals": {
+          "type": "number",
+          "description": "Available stock in quintals"
+        },
+        "price_per_quintal": {
+          "type": "number",
+          "description": "Expected price per quintal in INR"
+        },
+        "mandi": {
+          "type": "string",
+          "description": "Target APMC Mandi"
+        },
+        "quality_grade": {
+          "type": "string",
+          "description": "Quality grading"
+        },
+        "status": {
+          "type": "string",
+          "description": "Listing status"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "userId", "crop", "quantity_quintals", "price_per_quintal"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile records restricted to the owning farmer"
+    },
+    "/plots/{plotId}": {
+      "schema": "FarmPlot",
+      "description": "Georeferenced farm plots and boundary data owned by the authenticated farmer"
+    },
+    "/market_listings/{listingId}": {
+      "schema": "MarketplaceListing",
+      "description": "Marketplace agricultural produce listings visible to all and modifiable by seller"
+    }
+  }
+}

@@ -312,9 +312,16 @@ export default AcousticScannerScreen;
 const convertBlobToWav = async (blob: Blob): Promise<Blob> => {
     const arrayBuffer = await blob.arrayBuffer();
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    
-    return audioBufferToWav(audioBuffer);
+    try {
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        return audioBufferToWav(audioBuffer);
+    } finally {
+        try {
+            if (audioContext.state !== 'closed') {
+                audioContext.close().catch(() => {});
+            }
+        } catch {}
+    }
 };
 
 const audioBufferToWav = (buffer: AudioBuffer): Blob => {

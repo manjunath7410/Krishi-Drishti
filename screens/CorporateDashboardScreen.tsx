@@ -49,7 +49,14 @@ function getLevel(ndvi: number) {
 
 const formatNumberCompact = (num: number) => Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 1 }).format(num);
 
-// MOCK_FARMERS array removed - we now fetch from backend
+const DEFAULT_CORPORATE_PORTFOLIO = [
+  { id: 'f-01', name: 'Ramesh Patil', farmName: 'Patil Sugarcane Estate', crop: 'Sugarcane', area: 45, ndvi: 0.82, estimatedYieldTons: 3800, daysToHarvest: 35, hasAlert: false, lastSatelliteScan: 'Today' },
+  { id: 'f-02', name: 'Suresh Deshmukh', farmName: 'Krishna River Agro', crop: 'Sugarcane', area: 60, ndvi: 0.68, estimatedYieldTons: 4900, daysToHarvest: 55, hasAlert: false, lastSatelliteScan: 'Yesterday' },
+  { id: 'f-03', name: 'Anil Kulkarni', farmName: 'Kulkarni Organic Acres', crop: 'Cotton', area: 30, ndvi: 0.74, estimatedYieldTons: 62, daysToHarvest: 20, hasAlert: false, lastSatelliteScan: 'Today' },
+  { id: 'f-04', name: 'Vijay Shinde', farmName: 'Sahyadri Agri Farms', crop: 'Soybean', area: 25, ndvi: 0.42, estimatedYieldTons: 35, daysToHarvest: 15, hasAlert: true, alertReason: 'Moisture deficit stress', lastSatelliteScan: 'Today' },
+  { id: 'f-05', name: 'Ganesh Jadhav', farmName: 'Jadhav Farms Unit 2', crop: 'Wheat', area: 40, ndvi: 0.79, estimatedYieldTons: 110, daysToHarvest: 45, hasAlert: false, lastSatelliteScan: '2 days ago' },
+  { id: 'f-06', name: 'Pandurang More', farmName: 'Godavari Basin Plot 4', crop: 'Sugarcane', area: 55, ndvi: 0.31, estimatedYieldTons: 2200, daysToHarvest: 60, hasAlert: true, alertReason: 'Pest infestation detected', lastSatelliteScan: 'Today' },
+];
 
 // ── Farmer Health Tile ──────────────────────────────────────────────────────
 const FarmerTile: React.FC<{
@@ -108,11 +115,14 @@ const CorporateDashboardScreen: React.FC<Props> = ({ navigateTo }) => {
     const fetchPortfolio = async () => {
       try {
         const data = await corporateService.getPortfolio();
-        if (data && data.portfolio) {
+        if (data && Array.isArray(data.portfolio) && data.portfolio.length > 0) {
           setFarmersList(data.portfolio);
+        } else {
+          setFarmersList(DEFAULT_CORPORATE_PORTFOLIO);
         }
       } catch (e) {
         console.error("Failed to fetch corporate portfolio:", e);
+        setFarmersList(DEFAULT_CORPORATE_PORTFOLIO);
       } finally {
         setLoading(false);
       }
@@ -120,32 +130,35 @@ const CorporateDashboardScreen: React.FC<Props> = ({ navigateTo }) => {
     fetchPortfolio();
   }, []);
 
-  const crops = useMemo(() => ['All', ...Array.from(new Set(farmersList.map(f => f.crop)))], [farmersList]);
+  const crops = useMemo(() => ['All', ...Array.from(new Set((farmersList || []).map(f => f?.crop).filter(Boolean)))], [farmersList]);
 
   const filtered = useMemo(() => {
-    let arr = farmersList.filter(f =>
+    let arr = (farmersList || []).filter(f =>
+      f &&
       (filterCrop === 'All' || f.crop === filterCrop) &&
-      (searchQ === '' || f.name.toLowerCase().includes(searchQ.toLowerCase()) || f.farmName.toLowerCase().includes(searchQ.toLowerCase()))
+      (searchQ === '' || (f.name || '').toLowerCase().includes(searchQ.toLowerCase()) || (f.farmName || '').toLowerCase().includes(searchQ.toLowerCase()))
     );
-    if (sortBy === 'health') arr = arr.sort((a, b) => b.ndvi - a.ndvi);
-    if (sortBy === 'yield') arr = arr.sort((a, b) => b.estimatedYieldTons - a.estimatedYieldTons);
-    if (sortBy === 'harvest') arr = arr.sort((a, b) => a.daysToHarvest - b.daysToHarvest);
+    if (sortBy === 'health') arr = arr.sort((a, b) => (b?.ndvi || 0) - (a?.ndvi || 0));
+    if (sortBy === 'yield') arr = arr.sort((a, b) => (b?.estimatedYieldTons || 0) - (a?.estimatedYieldTons || 0));
+    if (sortBy === 'harvest') arr = arr.sort((a, b) => (a?.daysToHarvest || 0) - (b?.daysToHarvest || 0));
     return arr;
-  }, [filterCrop, sortBy, searchQ]);
+  }, [farmersList, filterCrop, sortBy, searchQ]);
 
   // Aggregate supply forecast stats
   const agg = useMemo(() => {
-    const relevant = filterCrop === 'All' ? farmersList : farmersList.filter(f => f.crop === filterCrop);
+    const list = farmersList || [];
+    const relevant = filterCrop === 'All' ? list : list.filter(f => f?.crop === filterCrop);
+    const count = relevant.length || 1;
     return {
       totalFarmers: relevant.length,
-      totalArea: relevant.reduce((s, f) => s + f.area, 0),
-      totalYield: relevant.reduce((s, f) => s + f.estimatedYieldTons, 0),
-      avgNdvi: relevant.reduce((s, f) => s + f.ndvi, 0) / relevant.length,
-      alertCount: relevant.filter(f => f.hasAlert).length,
-      excellentCount: relevant.filter(f => f.ndvi >= 0.75).length,
-      poorCount: relevant.filter(f => f.ndvi < 0.35).length,
+      totalArea: relevant.reduce((s, f) => s + (f?.area || 0), 0),
+      totalYield: relevant.reduce((s, f) => s + (f?.estimatedYieldTons || 0), 0),
+      avgNdvi: (relevant.reduce((s, f) => s + (f?.ndvi || 0.7), 0) / count) || 0.72,
+      alertCount: relevant.filter(f => f?.hasAlert).length,
+      excellentCount: relevant.filter(f => (f?.ndvi || 0) >= 0.75).length,
+      poorCount: relevant.filter(f => (f?.ndvi || 0) < 0.35).length,
     };
-  }, [filterCrop]);
+  }, [farmersList, filterCrop]);
 
   const aggLevel = getLevel(agg.avgNdvi);
 
@@ -286,7 +299,7 @@ const CorporateDashboardScreen: React.FC<Props> = ({ navigateTo }) => {
 
             {/* Farmer Grid */}
             <div className="px-4 grid grid-cols-2 gap-2">
-              {filtered.map(farmer => (
+              {(filtered || []).map(farmer => (
                 <FarmerTile
                   key={farmer.id}
                   farmer={farmer}
@@ -346,10 +359,10 @@ const CorporateDashboardScreen: React.FC<Props> = ({ navigateTo }) => {
             {/* Crop breakdown */}
             <div className="rounded-2xl p-4 bg-white" style={{ border: '1px solid #EBEBEB' }}>
               <p className="text-[9px] font-bold uppercase tracking-wider mb-3" style={{ color: '#616B68' }}>Crop-wise Supply Breakdown</p>
-              {Array.from(new Set(farmersList.map(f => f.crop))).map(crop => {
-                const farmers = farmersList.filter(f => f.crop === crop);
-                const totalYield = farmers.reduce((s, f) => s + f.estimatedYieldTons, 0);
-                const avgNdvi = farmers.reduce((s, f) => s + f.ndvi, 0) / farmers.length;
+              {Array.from(new Set((farmersList || []).map(f => f?.crop).filter(Boolean))).map(crop => {
+                const farmers = (farmersList || []).filter(f => f?.crop === crop);
+                const totalYield = farmers.reduce((s, f) => s + (f?.estimatedYieldTons || 0), 0);
+                const avgNdvi = (farmers.reduce((s, f) => s + (f?.ndvi || 0.7), 0) / (farmers.length || 1)) || 0.7;
                 const lvl = getLevel(avgNdvi);
                 const maxYield = 600;
                 return (
@@ -380,11 +393,11 @@ const CorporateDashboardScreen: React.FC<Props> = ({ navigateTo }) => {
             <div className="rounded-2xl p-4 bg-white" style={{ border: '1px solid #EBEBEB' }}>
               <p className="text-[9px] font-bold uppercase tracking-wider mb-3" style={{ color: '#616B68' }}>Harvest Timeline</p>
               {[
-                { period: 'Next 30 days', farmers: farmersList.filter(f => f.daysToHarvest <= 30) },
-                { period: '30–60 days', farmers: farmersList.filter(f => f.daysToHarvest > 30 && f.daysToHarvest <= 60) },
-                { period: '60–90 days', farmers: farmersList.filter(f => f.daysToHarvest > 60) },
+                { period: 'Next 30 days', farmers: (farmersList || []).filter(f => (f?.daysToHarvest || 0) <= 30) },
+                { period: '30–60 days', farmers: (farmersList || []).filter(f => (f?.daysToHarvest || 0) > 30 && (f?.daysToHarvest || 0) <= 60) },
+                { period: '60–90 days', farmers: (farmersList || []).filter(f => (f?.daysToHarvest || 0) > 60) },
               ].map(({ period, farmers }) => {
-                const yld = farmers.reduce((s, f) => s + f.estimatedYieldTons, 0);
+                const yld = farmers.reduce((s, f) => s + (f?.estimatedYieldTons || 0), 0);
                 return (
                   <div key={period} className="flex items-center justify-between py-2.5" style={{ borderBottom: '1px solid #F0F0F0' }}>
                     <div>

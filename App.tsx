@@ -35,9 +35,11 @@ import LandingScreen from './screens/LandingScreen';
 import BottomNav from './components/BottomNav';
 import VoiceAssistantModal from './components/VoiceAssistantModal';
 import CommandPalette from './components/CommandPalette';
+import { SentryErrorBoundary } from './components/SentryErrorBoundary';
 import { userService, weatherService, getUserLocation, getPinpointLocation, watchRealTimeLocation } from './src/services/api';
 import { translations } from './translations';
 import { LanguageProvider } from './src/context/LanguageContext';
+import { AuthProvider } from './src/context/AuthContext';
 
 // Performance Code-Splitting for heavy secondary modules
 const FarmMapScreen = React.lazy(() => import('./screens/FarmMapScreen'));
@@ -58,6 +60,7 @@ const SmartIrrigationScreen = React.lazy(() => import('./screens/SmartIrrigation
 const DigitalTwinScreen = React.lazy(() => import('./screens/DigitalTwinScreen'));
 const VeoStudioScreen = React.lazy(() => import('./screens/VeoStudioScreen').then(m => ({ default: m.VeoStudioScreen })));
 const MediaGalleryScreen = React.lazy(() => import('./screens/MediaGalleryScreen').then(m => ({ default: m.MediaGalleryScreen })));
+const MonitoringDashboardScreen = React.lazy(() => import('./screens/MonitoringDashboardScreen'));
 
 // Ultra-fast Skeleton loader for lazy screens
 const ScreenSkeleton: React.FC = () => (
@@ -75,57 +78,14 @@ const ScreenSkeleton: React.FC = () => (
 const App: React.FC = () => {
   return (
     <LanguageProvider>
-      <ErrorBoundary>
-        <AppContent />
-      </ErrorBoundary>
+      <AuthProvider>
+        <SentryErrorBoundary fallbackTitle="Krishi-Drishti System Recovery" onReset={() => window.location.reload()}>
+          <AppContent />
+        </SentryErrorBoundary>
+      </AuthProvider>
     </LanguageProvider>
   );
 };
-
-interface ErrorBoundaryState { hasError: boolean; error: Error | null; }
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, ErrorBoundaryState> {
-  state: ErrorBoundaryState = { hasError: false, error: null };
-  declare props: { children: React.ReactNode };
-
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-  }
-
-  static getDerivedStateFromError(error: any) {
-    return { hasError: true, error };
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-red-100 p-6 flex items-center justify-center">
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-8 border border-red-100"
-          >
-            <div className="w-20 h-20 bg-gradient-to-br from-red-500 to-orange-500 rounded-2xl flex items-center justify-center mb-6 mx-auto shadow-lg shadow-red-200">
-              <AlertTriangle className="w-10 h-10 text-white" />
-            </div>
-            <h1 className="text-2xl font-black text-gray-900 mb-2 text-center">Oops! Something Broke</h1>
-            <p className="text-sm text-gray-500 text-center mb-4">Don't worry, we can fix this</p>
-            <pre className="text-xs font-mono bg-gray-50 p-4 rounded-2xl border border-gray-200 whitespace-pre-wrap max-h-40 overflow-auto text-red-700">
-              {this.state.error?.toString()}
-            </pre>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-6 w-full px-4 py-4 bg-gradient-to-r from-red-600 to-orange-600 text-white rounded-2xl font-bold shadow-lg shadow-red-200 active:scale-95 transition-transform flex items-center justify-center gap-2"
-            >
-              <RefreshCw className="w-5 h-5" />
-              Reload App
-            </button>
-          </motion.div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 const AppContent: React.FC = () => {
   const [showSplash, setShowSplash] = useState(true);
@@ -850,6 +810,8 @@ const AppContent: React.FC = () => {
         return <VeoStudioScreen navigateTo={navigateTo} capturedImage={capturedImage} t={t} />;
       case 'media-gallery':
         return <MediaGalleryScreen navigateTo={navigateTo} t={t} />;
+      case 'monitoring':
+        return <MonitoringDashboardScreen onBack={() => navigateTo('profile')} t={t} />;
       default:
         return (
           <AuthScreen
@@ -865,7 +827,7 @@ const AppContent: React.FC = () => {
     }
   };
 
-  const showNav = !['landing', 'auth', 'profile', 'market-detail', 'live-audio', 'carbon-vault', 'scheme-setu', 'landmark', 'chat', 'vision', 'vision-result', 'acoustic-scanner', 'traceability', 'trace-verify', 'field-monitor', 'corporate-dashboard', 'crop-cycle', 'smart-irrigation', 'digital-twin', 'veo-studio', 'media-gallery'].includes(currentScreen);
+  const showNav = !['landing', 'auth', 'profile', 'market-detail', 'live-audio', 'carbon-vault', 'scheme-setu', 'landmark', 'chat', 'vision', 'vision-result', 'acoustic-scanner', 'traceability', 'trace-verify', 'field-monitor', 'corporate-dashboard', 'crop-cycle', 'smart-irrigation', 'digital-twin', 'veo-studio', 'media-gallery', 'monitoring'].includes(currentScreen);
 
   return (
     <div className="min-h-screen bg-slate-950 text-gray-900 flex flex-col selection:bg-emerald-500 selection:text-white" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>

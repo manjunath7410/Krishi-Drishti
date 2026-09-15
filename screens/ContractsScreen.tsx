@@ -36,9 +36,10 @@ const ContractsScreen: React.FC<ContractsScreenProps> = ({ navigateTo, t }) => {
         try {
             const status = activeTab === 'market' ? 'Open' : 'Signed';
             const data = await contractService.getContracts(status);
-            setContracts(data);
+            setContracts(Array.isArray(data) ? data : []);
         } catch (e) {
             console.error(e);
+            setContracts([]);
         } finally {
             setLoading(false);
         }
@@ -105,7 +106,7 @@ const ContractsScreen: React.FC<ContractsScreenProps> = ({ navigateTo, t }) => {
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {contracts.map(c => (
+                        {(contracts || []).map(c => (
                             <div key={c.id} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden group active:scale-[0.98] transition-all">
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="flex items-center gap-3">

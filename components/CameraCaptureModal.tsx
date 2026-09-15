@@ -173,6 +173,11 @@ export const CameraCaptureModal: React.FC<CameraCaptureModalProps> = ({
 
       osc.start();
       osc.stop(ctx.currentTime + 0.08);
+      osc.onended = () => {
+        try {
+          if (ctx.state !== 'closed') ctx.close().catch(() => {});
+        } catch {}
+      };
     } catch {
       // AudioContext blocked or unsupported, fail silently
     }

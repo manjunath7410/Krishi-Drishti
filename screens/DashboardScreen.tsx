@@ -111,11 +111,13 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({
     const fetchPlots = async () => {
       try {
         const data = await plotService.getPlots();
-        setUserPlots(data);
+        const safePlots = Array.isArray(data) ? data : [];
+        setUserPlots(safePlots);
 
         // Instant location assignment from plot metadata, avoiding UI-blocking sequential network requests
         const locationMap: { [key: number]: string } = {};
-        for (const plot of data) {
+        for (const plot of safePlots) {
+          if (!plot) continue;
           const nameMatch = plot.name?.match(/\(([^)]+)\)/);
           if (nameMatch && nameMatch[1]) {
             locationMap[plot.id] = nameMatch[1];
@@ -127,6 +129,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
       } catch (error) {
         console.error('Failed to fetch user plots:', error);
+        setUserPlots([]);
       } finally {
         setIsLoadingPlots(false);
       }
@@ -711,7 +714,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({
         >
           <h2 className="text-base font-bold text-gray-900 mb-4">Commodities &amp; Food</h2>
           <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 pr-6 snap-x">
-            {crops.map((crop, idx) => (
+            {(crops || []).map((crop, idx) => (
               <motion.div
                 key={idx}
                 variants={itemVariants}
@@ -757,7 +760,7 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({
           </div>
         )}
 
-        {!isLoadingPlots && userPlots.length === 0 && (
+        {!isLoadingPlots && (!userPlots || userPlots.length === 0) && (
           <button
             onClick={() => navigateTo('map')}
             className="w-full flex items-center gap-4 p-4 rounded-2xl active:scale-95 transition-transform"
@@ -774,9 +777,9 @@ const DashboardScreen: React.FC<DashboardScreenProps> = ({
           </button>
         )}
 
-        {!isLoadingPlots && userPlots.length > 0 && (
+        {!isLoadingPlots && userPlots && userPlots.length > 0 && (
           <div className="space-y-3">
-            {userPlots.map((plot) => (
+            {(userPlots || []).map((plot) => (
               <div key={plot.id} className="bg-white rounded-2xl overflow-hidden" style={{ border: '1px solid #F0F0F0', boxShadow: '0 2px 8px rgba(0,187,120,0.06)' }}>
                 {/* Field image */}
                 <div className="relative h-36 w-full">

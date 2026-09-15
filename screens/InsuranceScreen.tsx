@@ -37,9 +37,10 @@ const InsuranceScreen: React.FC<InsuranceScreenProps> = ({ navigateTo, t }) => {
     try {
       setLoading(true);
       const data = await insuranceService.search(query);
-      setInsurances(data);
+      setInsurances(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch insurances', error);
+      setInsurances([]);
     } finally {
       setLoading(false);
     }
@@ -100,7 +101,7 @@ const InsuranceScreen: React.FC<InsuranceScreenProps> = ({ navigateTo, t }) => {
             <Loader2 className="animate-spin text-green-600" size={28} />
             <p className="text-sm text-gray-500">Loading plans…</p>
           </div>
-        ) : insurances.length === 0 ? (
+        ) : !insurances || insurances.length === 0 ? (
           <div className="flex flex-col items-center py-16 gap-3">
             <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center">
               <AlertCircle size={28} className="text-gray-300" />
@@ -110,7 +111,7 @@ const InsuranceScreen: React.FC<InsuranceScreenProps> = ({ navigateTo, t }) => {
           </div>
         ) : (
           <div className="space-y-3">
-            {insurances.map((ins) => {
+            {(insurances || []).map((ins) => {
               const { Icon, color, bg } = getIconAndColor(ins.type);
               return (
                 <div

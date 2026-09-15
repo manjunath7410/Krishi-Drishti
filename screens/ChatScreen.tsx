@@ -154,6 +154,9 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ navigateTo, language, t, onOpen
 
       const data = await aiService.chat(finalMessage);
       const aiText = data.response || "I can't answer that right now.";
+      if (data.sources && data.sources.length > 0) {
+        setGroundingUrls(data.sources);
+      }
       setMessages(prev => [...prev, { role: 'model', text: aiText }]);
 
     } catch (error) {

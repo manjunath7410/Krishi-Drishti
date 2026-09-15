@@ -252,6 +252,18 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         window.open('tel:18001801551');
       },
       keywords: ['sos', 'emergency', 'helpline', 'call', 'kisan call centre', 'phone', 'expert']
+    },
+    {
+      id: 'monitoring',
+      title: 'Reliability & Sentry Error Monitoring',
+      subtitle: 'Real-time telemetry, crash reporting, promise rejection trap & web vitals',
+      category: 'Traceability & Corporate',
+      icon: ShieldCheck,
+      iconBg: '#ECFDF5',
+      iconColor: '#059669',
+      badge: 'Telemetry',
+      action: () => onNavigate('monitoring'),
+      keywords: ['sentry', 'monitoring', 'error', 'reliability', 'crash', 'vitals', 'telemetry', 'logs', 'latency', 'health']
     }
   ], [onNavigate, onOpenVoice]);
 

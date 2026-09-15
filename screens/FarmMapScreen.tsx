@@ -65,10 +65,12 @@ const FarmMapScreen: React.FC<FarmMapScreenProps> = ({ navigateTo }) => {
   const fetchPlots = async () => {
     try {
       const data = await plotService.getPlots();
-      setPlots(data);
-      if (data.length > 0) setSelectedPlot(data[0]);
+      const safePlots = Array.isArray(data) ? data : [];
+      setPlots(safePlots);
+      if (safePlots.length > 0) setSelectedPlot(safePlots[0]);
     } catch (e) {
       console.error("Failed to fetch plots", e);
+      setPlots([]);
     } finally {
       setLoading(false);
     }
@@ -134,7 +136,7 @@ const FarmMapScreen: React.FC<FarmMapScreenProps> = ({ navigateTo }) => {
         
         {/* Top Field Cards Carousel */}
         <div className="mt-4 flex overflow-x-auto gap-4 px-5 pb-4 snap-x snap-mandatory no-scrollbar" style={{ scrollBehavior: 'smooth' }}>
-          {plots.map((plot) => (
+          {(plots || []).map((plot) => (
             <div
               key={plot.id}
               onClick={() => setSelectedPlot(plot)}
@@ -161,11 +163,11 @@ const FarmMapScreen: React.FC<FarmMapScreenProps> = ({ navigateTo }) => {
 
               {/* Bar Chart Visualization */}
               <div className="h-12 flex items-end justify-between gap-1 mb-4">
-                {chartData.map((h, i) => (
+                {(chartData || []).map((h, i) => (
                   <div
                     key={i}
                     className="w-full rounded-t-sm transition-all"
-                    style={{ height: `${h}%`, background: i === chartData.length - 1 ? '#00BB78' : '#EBEBEB' }}
+                    style={{ height: `${h}%`, background: i === (chartData || []).length - 1 ? '#00BB78' : '#EBEBEB' }}
                   />
                 ))}
               </div>
@@ -207,10 +209,10 @@ const FarmMapScreen: React.FC<FarmMapScreenProps> = ({ navigateTo }) => {
                 trigger={recenterTrigger}
               />
 
-              {plots.map((plot) => (
+              {(plots || []).map((plot) => (
                 <Polygon
                   key={plot.id}
-                  positions={plot.coordinates}
+                  positions={plot.coordinates || []}
                   pathOptions={{
                     color: '#00BB78',
                     fillColor: '#00BB78',

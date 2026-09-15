@@ -1,4 +1,4 @@
-export type Screen = 'landing' | 'auth' | 'home' | 'chat' | 'vision' | 'vision-result' | 'map' | 'market' | 'market-detail' | 'insurance' | 'forecast' | 'live-audio' | 'carbon-vault' | 'scheme-setu' | 'contracts' | 'crop-stress' | 'profile' | 'globe' | 'landmark' | 'acoustic-scanner' | 'soil-carbon' | 'traceability' | 'trace-verify' | 'field-monitor' | 'crop-cycle' | 'marketplace' | 'corporate-dashboard' | 'smart-irrigation' | 'digital-twin' | 'veo-studio' | 'media-gallery';
+export type Screen = 'landing' | 'auth' | 'home' | 'chat' | 'vision' | 'vision-result' | 'map' | 'market' | 'market-detail' | 'insurance' | 'forecast' | 'live-audio' | 'carbon-vault' | 'scheme-setu' | 'contracts' | 'crop-stress' | 'profile' | 'globe' | 'landmark' | 'acoustic-scanner' | 'soil-carbon' | 'traceability' | 'trace-verify' | 'field-monitor' | 'crop-cycle' | 'marketplace' | 'corporate-dashboard' | 'smart-irrigation' | 'digital-twin' | 'veo-studio' | 'media-gallery' | 'monitoring';
 
 export type Language = 'en' | 'hi' | 'mr' | 'bn' | 'te' | 'ta' | 'pa' | 'kn';
 

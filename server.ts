@@ -416,7 +416,7 @@ Provide a clear, encouraging explanation in exactly 3 actionable bullet points.`
   });
 });
 
-// AI Chatbot Assistant (Server-side Gemini proxy)
+// AI Chatbot Assistant (Server-side Gemini proxy with Search Grounding)
 app.post('/api/ai/chat', async (req: Request, res: Response) => {
   const { message, language } = req.body || {};
   const ai = getGeminiClient();
@@ -424,21 +424,37 @@ app.post('/api/ai/chat', async (req: Request, res: Response) => {
   if (ai && message) {
     try {
       const systemInstruction = `You are Krishi-Drishti's Senior AI Agronomist & Farm Advisor. 
-You provide scientific, practical, cost-effective, and organic-first advice to Indian farmers.
+You provide real-time, scientific, practical, cost-effective, and organic-first advice to Indian farmers.
 Language requested: ${language || 'English / Hinglish'}.
 Farmer Context: Located in Maharashtra / Central India growing Cotton, Soybean, Pulses, Oranges, Wheat.
+Use current Google Search data to verify live market mandi prices (APMC), government notices, and real-time weather/pest forecasts.
 Keep answers concise, structured with bullet points, and specify safe dosages (e.g. ml/liter).`;
 
       const aiRes = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: [
           { role: 'user', parts: [{ text: `${systemInstruction}\n\nFarmer Question: ${message}` }] }
-        ]
+        ],
+        config: {
+          tools: [{ googleSearch: {} }]
+        }
       });
 
       const text = aiRes.text?.trim();
+      // Extract search grounding metadata if present
+      const searchChunks = (aiRes.candidates?.[0] as any)?.groundingMetadata?.groundingChunks || [];
+      const searchSources = searchChunks
+        .filter((c: any) => c.web?.uri)
+        .map((c: any) => ({
+          title: c.web.title || 'Government / Agricultural Source',
+          uri: c.web.uri
+        }));
+
       if (text) {
-        res.json({ response: text });
+        res.json({ 
+          response: text,
+          sources: searchSources.slice(0, 4)
+        });
         return;
       }
     } catch (err: any) {
@@ -699,6 +715,61 @@ app.post('/api/market', (req: Request, res: Response) => {
   };
   serverListings.unshift(newListing);
   res.status(201).json(newListing);
+});
+
+// ==========================================
+// 6.5 SENTRY & PRODUCTION RELIABILITY MONITORING
+// ==========================================
+interface ServerMonitoringEvent {
+  id: string;
+  type: string;
+  message: string;
+  timestamp: number;
+  severity: string;
+  handled: boolean;
+  metadata?: any;
+  sentryEventId?: string;
+}
+const monitoringEventsBuffer: ServerMonitoringEvent[] = [];
+const MAX_SERVER_MONITORING_EVENTS = 200;
+
+app.post('/api/monitoring/events', (req: Request, res: Response) => {
+  const evt = req.body;
+  if (evt && (evt.message || evt.type)) {
+    const record: ServerMonitoringEvent = {
+      id: evt.id || `srv_err_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      type: evt.type || 'error',
+      message: evt.message || 'Unknown event',
+      timestamp: evt.timestamp || Date.now(),
+      severity: evt.severity || 'error',
+      handled: evt.handled ?? false,
+      sentryEventId: evt.sentryEventId,
+      metadata: evt.metadata
+    };
+    monitoringEventsBuffer.unshift(record);
+    if (monitoringEventsBuffer.length > MAX_SERVER_MONITORING_EVENTS) {
+      monitoringEventsBuffer.pop();
+    }
+    console.log(`[Monitoring Telemetry] Logged ${record.type} (${record.severity}): "${record.message.slice(0, 80)}"`);
+    res.status(201).json({ status: 'logged', id: record.id });
+    return;
+  }
+  res.status(400).json({ error: 'Invalid event payload' });
+});
+
+app.get('/api/monitoring/events', (req: Request, res: Response) => {
+  res.json({
+    status: 'ok',
+    total: monitoringEventsBuffer.length,
+    events: monitoringEventsBuffer,
+    uptimeSeconds: Math.round(process.uptime()),
+    serverMemoryMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024 * 10) / 10
+  });
+});
+
+app.delete('/api/monitoring/events', (req: Request, res: Response) => {
+  monitoringEventsBuffer.length = 0;
+  res.json({ status: 'cleared' });
 });
 
 // Global API Fallback for any unhandled /api calls

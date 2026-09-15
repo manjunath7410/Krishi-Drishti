@@ -51,9 +51,19 @@ const CropCycleScreen: React.FC<Props> = ({ navigateTo, screenData }) => {
     try {
       setLoading(true);
       const data = await cropCycleService.getCycles(plotId);
-      setCycleData(data);
+      // Ensure data format is normalized
+      if (Array.isArray(data) && data.length > 0) {
+        setCycleData({ cycle: data[0], events: data[0].events || [] });
+      } else if (data && data.cycle) {
+        setCycleData({ cycle: data.cycle, events: Array.isArray(data.events) ? data.events : [] });
+      } else if (data && data.id) {
+        setCycleData({ cycle: data, events: Array.isArray(data.events) ? data.events : [] });
+      } else {
+        setCycleData(null);
+      }
     } catch (e) {
       console.error("Failed to load crop cycle:", e);
+      setCycleData(null);
     } finally {
       setLoading(false);
     }
@@ -163,8 +173,8 @@ const CropCycleScreen: React.FC<Props> = ({ navigateTo, screenData }) => {
 
             {/* Timeline */}
             <div className="relative pl-6 border-l-2 border-gray-800 space-y-8 py-2">
-              {cycleData.events.map((event: any, i: number) => (
-                <div key={event.id} className="relative">
+              {(cycleData.events || []).map((event: any, i: number) => (
+                <div key={event.id || i} className="relative">
                   {/* Timeline Dot */}
                   <div className={`absolute -left-[35px] w-8 h-8 rounded-full flex items-center justify-center ring-4 ring-[#0a0f0a] ${EVENT_COLORS[event.event_type] || 'bg-gray-500 text-white'}`}>
                     {EVENT_ICONS[event.event_type] || <CheckCircle2 size={16} />}

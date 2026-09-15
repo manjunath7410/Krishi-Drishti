@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { UserProfile, Listing, ChatMessage } from '../../types';
 import { Geolocation } from '@capacitor/geolocation';
+import { recordApiLatency } from './monitoringService';
 
 // Cache last-known position in sessionStorage for quick re-use
 const LOCATION_CACHE_KEY = 'kd_last_location';
@@ -252,8 +253,9 @@ const resilientAdapter = async (config: any) => {
 api.defaults.adapter = resilientAdapter;
 // Note: Do not overwrite global axios.defaults.adapter to preserve external library fetchers
 
-// Request interceptor to add token & LOGGING
+// Request interceptor to add token & LOGGING & latency tracking
 api.interceptors.request.use((config) => {
+  (config as any)._startTime = Date.now();
   const token = localStorage.getItem('ks_token');
   if (token && config.headers) {
     if (typeof (config.headers as any).set === 'function') {
@@ -269,11 +271,27 @@ api.interceptors.request.use((config) => {
   return Promise.reject(error);
 });
 
-// Response interceptor for LOGGING
+// Response interceptor for LOGGING & Sentry Latency Monitoring
 api.interceptors.response.use((response) => {
-  console.log(`[API Res] ${response.status} ${response.config?.url || ''}`);
+  const start = (response.config as any)?._startTime;
+  const durationMs = start ? Date.now() - start : 20;
+  recordApiLatency({
+    url: response.config?.url || 'unknown',
+    method: response.config?.method?.toUpperCase() || 'GET',
+    status: response.status,
+    durationMs,
+  });
+  console.log(`[API Res] ${response.status} ${response.config?.url || ''} (${durationMs}ms)`);
   return response;
 }, (error) => {
+  const start = (error?.config as any)?._startTime;
+  const durationMs = start ? Date.now() - start : 50;
+  recordApiLatency({
+    url: error?.config?.url || 'unknown',
+    method: error?.config?.method?.toUpperCase() || 'GET',
+    status: error?.response?.status || 500,
+    durationMs,
+  });
   console.error('[API Res Error]', error?.response?.status, error?.message || String(error));
   return Promise.reject(error);
 });
@@ -297,10 +315,37 @@ export const authService = {
 
 export const userService = {
   getProfile: async () => {
+    try {
+      const { auth } = await import('./firebase');
+      if (auth.currentUser) {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const { db } = await import('./firebase');
+        const snap = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        if (snap.exists()) {
+          return snap.data() as UserProfile;
+        }
+      }
+    } catch (e) {
+      console.warn('[userService] Firestore getProfile notice:', e);
+    }
     const response = await api.get<UserProfile>('/users/me');
     return response.data;
   },
   updateProfile: async (profile: Partial<UserProfile>) => {
+    try {
+      const { auth } = await import('./firebase');
+      if (auth.currentUser) {
+        const { doc, setDoc } = await import('firebase/firestore');
+        const { db } = await import('./firebase');
+        await setDoc(doc(db, 'users', auth.currentUser.uid), {
+          ...profile,
+          uid: auth.currentUser.uid,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+    } catch (e) {
+      console.warn('[userService] Firestore updateProfile notice:', e);
+    }
     const response = await api.put<UserProfile>('/users/me', profile);
     return response.data;
   }
@@ -373,7 +418,7 @@ export const marketService = {
 
 export const aiService = {
   chat: async (message: string) => {
-    const response = await api.post<{ response: string }>('/ai/chat', { message });
+    const response = await api.post<{ response: string; sources?: { title: string; uri: string }[] }>('/ai/chat', { message });
     return response.data;
   },
   diagnose: async (imageFile: File, mode: string) => {
@@ -562,10 +607,49 @@ export const communityService = {
 
 export const plotService = {
   getPlots: async () => {
+    try {
+      const { auth } = await import('./firebase');
+      if (auth.currentUser) {
+        const { firestoreService } = await import('./firestoreService');
+        const firestorePlots = await firestoreService.getPlots(auth.currentUser.uid);
+        if (firestorePlots.length > 0) {
+          return firestorePlots.map(p => ({
+            id: p.id,
+            name: p.name,
+            coordinates: p.coordinates,
+            area: p.area_acres,
+            crop_type: p.crop,
+            health: p.health || 'Healthy',
+            ndvi: p.ndvi || 0.76
+          }));
+        }
+      }
+    } catch (e) {
+      console.warn('[plotService] Firestore getPlots fallback:', e);
+    }
     const response = await api.get('/plots/');
-    return response.data;
+    return Array.isArray(response?.data) ? response.data : (response?.data?.plots || []);
   },
-  createPlot: async (plot: { name: string, coordinates: { lat: number, lng: number }[], area: number, crop_type?: string }) => {
+  createPlot: async (plot: { name: string, coordinates: { lat: number, lng: number }[], area: number, crop_type?: string, gut_number?: string }) => {
+    try {
+      const { auth } = await import('./firebase');
+      if (auth.currentUser) {
+        const { firestoreService } = await import('./firestoreService');
+        await firestoreService.savePlot({
+          id: `plot_${Date.now()}`,
+          name: plot.name,
+          crop: plot.crop_type || 'Mixed',
+          area_acres: plot.area,
+          coordinates: plot.coordinates,
+          gut_number: plot.gut_number,
+          health: 'Good',
+          ndvi: 0.78,
+          soil_type: 'Clay Loam'
+        });
+      }
+    } catch (e) {
+      console.warn('[plotService] Firestore createPlot fallback:', e);
+    }
     const response = await api.post('/plots/', plot);
     return response.data;
   },

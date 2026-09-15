@@ -27,18 +27,19 @@ const FarmerMarketplaceScreen: React.FC<Props> = ({ navigateTo, t }) => {
     try {
       setLoading(true);
       const data = await marketplaceService.getTokens();
-      setTokens(data);
+      setTokens(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error("Failed to fetch marketplace tokens:", e);
+      setTokens([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredTokens = tokens.filter(tok => 
-    tok.crop_type.toLowerCase().includes(searchQ.toLowerCase()) || 
-    (tok.variety && tok.variety.toLowerCase().includes(searchQ.toLowerCase())) ||
-    tok.token_id.toLowerCase().includes(searchQ.toLowerCase())
+  const filteredTokens = (Array.isArray(tokens) ? tokens : []).filter(tok => 
+    (tok?.crop_type || '').toLowerCase().includes(searchQ.toLowerCase()) || 
+    (tok?.variety && tok.variety.toLowerCase().includes(searchQ.toLowerCase())) ||
+    (tok?.token_id || '').toLowerCase().includes(searchQ.toLowerCase())
   );
 
   return (
@@ -70,13 +71,13 @@ const FarmerMarketplaceScreen: React.FC<Props> = ({ navigateTo, t }) => {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {loading ? (
           <div className="flex justify-center py-12"><Loader2 className="animate-spin text-green-600" /></div>
-        ) : filteredTokens.length === 0 ? (
+        ) : !filteredTokens || filteredTokens.length === 0 ? (
           <div className="text-center py-12">
             <Package size={48} className="mx-auto text-gray-300 mb-4" />
             <p className="text-gray-500 font-medium">No verified crops available right now.</p>
           </div>
         ) : (
-          filteredTokens.map((token) => (
+          (filteredTokens || []).map((token) => (
             <motion.div
               key={token.token_id}
               whileHover={{ scale: 1.01 }}
@@ -189,11 +190,11 @@ const FarmerMarketplaceScreen: React.FC<Props> = ({ navigateTo, t }) => {
                 </div>
 
                 {/* Crop Cycle Timeline */}
-                {selectedToken.crop_cycle && selectedToken.crop_cycle.events.length > 0 && (
+                {selectedToken.crop_cycle && Array.isArray(selectedToken.crop_cycle.events) && selectedToken.crop_cycle.events.length > 0 && (
                   <div>
                     <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Audited Farm Timeline</h4>
                     <div className="pl-4 border-l-2 border-gray-100 space-y-4">
-                      {selectedToken.crop_cycle.events.map((ev: any, i: number) => (
+                      {(selectedToken.crop_cycle.events || []).map((ev: any, i: number) => (
                         <div key={i} className="relative">
                           <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-green-500 ring-4 ring-white" />
                           <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm">

@@ -17,7 +17,9 @@ import {
   Award,
   X,
   Wheat,
-  LogOut
+  LogOut,
+  Activity,
+  ShieldCheck
 } from 'lucide-react';
 import { userService } from '../src/services/api';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -309,6 +311,22 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onComplete, onLogout, t, 
             {loading ? <Loader2 size={18} className="animate-spin" /> : null}
             {t.complete_profile || 'Complete Profile'}
           </button>
+
+          {/* ==== RELIABILITY & SENTRY MONITORING ==== */}
+          {navigateTo && (
+            <button
+              onClick={() => navigateTo('monitoring')}
+              className="mt-4 w-full py-3.5 px-4 rounded-2xl font-bold text-xs bg-slate-900 text-white hover:bg-slate-800 transition-all flex items-center justify-between shadow-sm"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <ShieldCheck size={14} />
+                </div>
+                <span>Sentry Telemetry &amp; System Reliability</span>
+              </div>
+              <ChevronRight size={16} className="text-slate-400" />
+            </button>
+          )}
 
           {/* ==== LOGOUT BUTTON ==== */}
           {onLogout && (

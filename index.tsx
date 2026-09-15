@@ -3,6 +3,10 @@ console.log("[Index] Script started");
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { initMonitoring } from './src/services/monitoringService';
+
+// Initialize Sentry Global Error Tracking and Performance Monitoring
+initMonitoring();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -13,3 +17,4 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <App />
 );
+

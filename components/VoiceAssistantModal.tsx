@@ -32,6 +32,8 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({ isOpen, onClo
     const animationRef = useRef<number>();
     const analyserRef = useRef<AnalyserNode | null>(null);
 
+    const streamRef = useRef<MediaStream | null>(null);
+
     // Audio helper functions (Same as LiveAudioScreen)
     const decode = (base64: string) => {
         const binaryString = atob(base64);
@@ -82,6 +84,7 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({ isOpen, onClo
             audioContextOutRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
 
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            streamRef.current = stream;
 
             const currentLangLabel = languages.find(l => l.code === selectedLang)?.label || 'English';
 
@@ -194,6 +197,13 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({ isOpen, onClo
           Language: ${currentLangLabel}.
           Provide concise, practical farming advice.`
                 }
+            }).catch((connErr) => {
+                console.warn('[VoiceAssistant] Live connect error handled:', connErr?.message || String(connErr));
+                setIsConnecting(false);
+                setIsActive(false);
+                isActiveRef.current = false;
+                if (animationRef.current) cancelAnimationFrame(animationRef.current);
+                return null;
             });
             sessionRef.current = sessionPromise;
 
@@ -208,8 +218,28 @@ const VoiceAssistantModal: React.FC<VoiceAssistantModalProps> = ({ isOpen, onClo
         if (sessionRef.current) {
             sessionRef.current.then((session: any) => session.close()).catch(() => {});
         }
-        if (audioContextInRef.current) audioContextInRef.current.close();
-        if (audioContextOutRef.current) audioContextOutRef.current.close();
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => {
+                try { track.stop(); } catch {}
+            });
+            streamRef.current = null;
+        }
+        if (audioContextInRef.current) {
+            try {
+                if (audioContextInRef.current.state !== 'closed') {
+                    audioContextInRef.current.close().catch(() => {});
+                }
+            } catch {}
+            audioContextInRef.current = null;
+        }
+        if (audioContextOutRef.current) {
+            try {
+                if (audioContextOutRef.current.state !== 'closed') {
+                    audioContextOutRef.current.close().catch(() => {});
+                }
+            } catch {}
+            audioContextOutRef.current = null;
+        }
         setIsActive(false);
         isActiveRef.current = false;
         setIsConnecting(false);

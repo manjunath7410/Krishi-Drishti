@@ -177,6 +177,11 @@ const playPinDropChime = () => {
         gain.connect(audioCtx.destination);
         osc.start();
         osc.stop(audioCtx.currentTime + 0.25);
+        osc.onended = () => {
+            try {
+                if (audioCtx.state !== 'closed') audioCtx.close().catch(() => {});
+            } catch {}
+        };
     } catch {
         // AudioContext not allowed or unsupported
     }

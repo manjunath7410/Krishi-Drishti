@@ -11,7 +11,6 @@ import {
   Calendar,
   Film
 } from 'lucide-react';
-import { GoogleGenAI } from '@google/genai';
 import { aiService } from '../src/services/api';
 import { mediaGalleryService } from '../src/services/mediaGalleryService';
 
